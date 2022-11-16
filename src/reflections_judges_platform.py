@@ -84,6 +84,16 @@ body {
     return f"{head}\n\n{body}\n\n{tail}"
 
 
+def iframe_url(x: str):
+    x = x.replace("/view?usp=share_link", "/preview").replace("/view?usp=drivesdk", "/preview").replace("/view","/preview")
+    x = x.replace("https://drive.google.com/open?id=", "https://drive.google.com/file/d/") \
+        .replace("/view","/preview")
+    if not x.endswith("/preview"):
+        x += "/preview"
+    return x
+
+
+
 def img_and_other_elems(file_types, urls):
     arr = []
     # <img src=url width="500" height="600">
@@ -98,24 +108,32 @@ def img_and_other_elems(file_types, urls):
             # This used to work till 2021 but now thumbnail are stored under lh3
             # url_thumbnail = url.replace("https://drive.google.com/file/d/", "https://drive.google.com/thumbnail?id=")
             # url_thumbnail = url_thumbnail.replace("https://drive.google.com/open?", "https://drive.google.com/thumbnail?")
-            url_thumbnail = url.replace("https://drive.google.com/file/d/", "https://lh3.googleusercontent.com/d/")
-            url_thumbnail = url_thumbnail.replace("/view", "")
+            # https://drive.google.com/file/d/1WOdQZQ18xhBK8q8ZplJ2jHIpRPlEUN4l/view
+            # https://drive.google.com/open?id=1WOdQZQ18xhBK8q8ZplJ2jHIpRPlEUN4l
+
+            url_thumbnail = url.replace("https://drive.google.com/open?id=", "https://drive.google.com/file/d/")
+            url_thumbnail = url_thumbnail.replace("https://drive.google.com/file/d/", "https://lh3.googleusercontent.com/d/")
+            url_thumbnail = url_thumbnail.replace("/view", "/preview")
             arr.append(f'<img src="{url_thumbnail}" width="500" height="600">')
             arr.append(f'<a href="{url}" target="_blank">Original image high resolution</a>')
         elif file_type == "mp3":
-            url_mp3 = url.replace("/view?usp=share_link", "/preview").replace("/view?usp=drivesdk", "/preview")
-            arr.append(f'<iframe src="{url_mp3}" frameborder="1"width="640" height="480"></iframe>')
+            url_mp3 = iframe_url(url)
+            arr.append(f'<iframe src="{url_mp3}" frameborder="1" width="640" height="480"></iframe>')
             arr.append(f'<a href={url_mp3}>Original audio link</a>')
         elif file_type == "mp4":
-            url_mp4 = url.replace("/view?usp=share_link", "/preview").replace("/view?usp=drivesdk", "/preview")
-            arr.append(f'<iframe src="{url_mp4}" frameborder="1"width="640" height="480"></iframe>')
+            url_mp4 = iframe_url(url)
+            arr.append(f'<iframe src="{url_mp4}" frameborder="1" width="640" height="480"></iframe>')
             arr.append(f'<a href={url_mp4}>Original video link</a>')
         elif file_type == "pdf":
-            url_pdf = url.replace("/view?usp=share_link", "/preview").replace("/view?usp=drivesdk", "/preview")
-            arr.append(f'<iframe src="{url_pdf}" frameborder="1"width="640" height="480"></iframe>')
+            # https://drive.google.com/open?id=1ySyK_mZ97BafYSGHzAtNKvxe9c8p28XI
+            # https://drive.google.com/file/d/1ySyK_mZ97BafYSGHzAtNKvxe9c8p28XI/view
+            # https://drive.google.com/file/d/1aGh69Sm5bta5U63Iu-EaxV1mWn9iyvPT/edit
+            url_pdf = iframe_url(url)
+            arr.append(f'<iframe src="{url_pdf}" frameborder="1" width="640" height="480"></iframe>')
             # arr.append(f'<a href={url}>Original PDF link</a>')
         elif file_type == "docx":
-            url_docx = url.replace("/view?usp=share_link", "/preview").replace("/view?usp=drivesdk", "/preview")
+            url_docx = iframe_url(url)
+            arr.append(f'<iframe src="{url_docx}" frameborder="1" width="640" height="480"></iframe>')
             arr.append(f'<a href={url_docx}>Original docx link</a>')
         else:
             arr.append(f'<a href="{url}" target="_blank">Original link (file type: {file_type})</a>')
@@ -395,8 +413,8 @@ def alternate_dict_keys(d, alt_keys):
 
 
 # TODO update these dict keys (e.g, timestamp can be missing).
-# Timestamp	Email Address	Student first name	Student last name	Grade	Teacher's  name	Upload entry form with file name as (firstname.lastname.grade.pdf) 	                    Arts Category	Grade division	Upload entry file	                                                    Are the file names you are uploading like so  (firstname.lastname.grade.pdf) ?	Does your artwork follow the submission guidelines (size/format etc.)?	Title of artwork	Are you submitting again with updates?	Artist's statement	Artwork details
-# 	        Email Address	Student first name	Student last name	Grade	Teacher's  name	"entry form - google drive link with file name as (form.firstname.lastname.grade.pdf)" 	Arts Category	Grade division	"Upload entry file with file name as (firstname.lastname.grade)"			                                                                                                                                                        Title of artwork		                                    Artist statement	Artwork details
+# Timestamp Email Address   Student first name  Student last name   Grade   Teacher's  name Upload entry form with file name as (firstname.lastname.grade.pdf)                      Arts Category   Grade division  Upload entry file                                                       Are the file names you are uploading like so  (firstname.lastname.grade.pdf) ?  Does your artwork follow the submission guidelines (size/format etc.)?  Title of artwork    Are you submitting again with updates?  Artist's statement  Artwork details
+#           Email Address   Student first name  Student last name   Grade   Teacher's  name "entry form - google drive link with file name as (form.firstname.lastname.grade.pdf)"  Arts Category   Grade division  "Upload entry file with file name as (firstname.lastname.grade)"                                                                                                                                                                    Title of artwork                                            Artist statement    Artwork details
 # TODO ensure school name where it is hosted.
 def rename_dict_keys(d):
     # GIVEN:
@@ -484,15 +502,26 @@ def main(data_entries_fp: str, out_dir: str, judges: List[str], website_base_add
                        form_action=form_action)
 
 if __name__ == '__main__':
+    # for 2021-22 (Discovery)
     # main(data_entries_fp= "data/judges_input/real-judges-data.csv",
     #      out_dir= "data/forms",
     #      judges =["Dhivya", "Shweta", "Thom", "Trisha", "Whitney"],
     #      website_base_addr = "https://shrikrishnajewels.com/reflections",
     #      form_action="https://script.google.com/macros/s/AKfycbyi-42Psz_6118nWOeQNqSL_nXu4VejtnWVtuzH1U5P92w8IZTEXGKdtbmtXyi53ZJR8w/exec"
     #      )
-    main(data_entries_fp= "/private/tmp/reflections.sheet1.csv",
+
+    # for 2022-23 (Challenger)
+    # main(data_entries_fp= "/private/tmp/reflections.sheet1.csv",
+    #      out_dir= "data/forms",
+    #      judges =["Ryan Eronemo", "Larisa Eronemo", "Sabah Najam","Heidi Bennick", "Kim Blanchard"],
+    #      website_base_addr = "https://anjali.tandon.info/schools/reflections_challenger",
+    #      form_action="https://script.google.com/macros/s/AKfycbxUWRtQFUmzUb5RlX5dp9pzFyl2vMPfjZkZC-KX1eNE3HqeiPa3bZiWOP5YWun8ZpXT/exec"
+    #      )
+
+    # for 2022-23 (Discovery)
+    main(data_entries_fp= "/Users/nikett/Desktop/reflections.discovery.2022.csv",
          out_dir= "data/forms",
-         judges =["Ryan Eronemo", "Larisa Eronemo", "Sabah Najam","Heidi Bennick", "Kim Blanchard"],
-         website_base_addr = "https://anjali.tandon.info/schools/reflections_challenger",
-         form_action="https://script.google.com/macros/s/AKfycbxUWRtQFUmzUb5RlX5dp9pzFyl2vMPfjZkZC-KX1eNE3HqeiPa3bZiWOP5YWun8ZpXT/exec"
+         judges =["Dhivya", "Shweta", "Thom", "Trisha", "Whitney"],
+         website_base_addr = "https://anjali.tandon.info/schools/reflections_discovery",
+         form_action="https://script.google.com/macros/s/AKfycbyjb-sQNrv-wq0s-6Cv8HN3Z0IErmcL_4YiymPQnfpqgRN8FqXJUHAE7492NABX6QW0rg/exec"
          )
