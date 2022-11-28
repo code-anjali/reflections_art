@@ -46,11 +46,11 @@ def main():
         if submitted:
             st.write(f"\n{'*'*80}\n\nReflections results")
             (results, report) = reflections_result.main(judges_scores_fp=uploaded_judges_scoring_fp,
-                                                     ignore_coi=ignore_coi,
-                                                     min_num_judges_per_entry=min_num_judges_per_entry,
-                                                     judges_expertise=judges_expertise,
-                                                     reveal_score_in_report=reveal_score_in_report
-                                                     )
+                                                        ignore_coi=ignore_coi,
+                                                        min_num_judges_per_entry=min_num_judges_per_entry,
+                                                        judges_expertise_csv=judges_expertise,
+                                                        reveal_score_in_report=reveal_score_in_report
+                                                        )
             st.write(to_markdown_table(results))
             st.write(f"\n{'*'*80}\n\nResults stored at: {output_path}.")
             with open(output_path, 'w') as outfile:

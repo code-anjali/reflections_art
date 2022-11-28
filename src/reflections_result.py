@@ -4,15 +4,16 @@ from typing import List, Dict, Any
 
 from prettytable import PrettyTable
 
-from src.student_info import StudentInfo
 
 # todo in the future: fix bug in forms.html -- missing art title
+from src.student_info import StudentInfo
+
 
 class ReflectionsJudge:
-    def __init__(self, judge_name: str, expertise_in_category: str):
+    def __init__(self, judge_name: str, expertise_in_category_csv: str):
         self.judge_name = judge_name.lower().strip()
-        self.expertise_in_category = expertise_in_category.lower().strip()
-        self.is_expert = self.expertise_in_category != ""
+        self.expertise_in_category = [x.lower().strip() for x in expertise_in_category_csv.split(",") if x.strip()]
+        self.is_expert = len(self.expertise_in_category) > 0
 
     def __hash__(self):
         return hash(self.judge_name)
@@ -21,7 +22,7 @@ class ReflectionsJudge:
         return self.judge_name == other.judge_name
 
     def __repr__(self):
-        return f"{self.judge_name} {('(' + self.expertise_in_category + ')' if self.expertise_in_category else '').strip()}"
+        return f"{self.judge_name} {('expert of (' + ', '.join(self.expertise_in_category) + ')' if self.expertise_in_category else '').strip()}"
 
 class ReflectionsJudgeScore:
     def __init__(self, judge: ReflectionsJudge, csv_entry_dict: Dict[str, Any]):
@@ -63,7 +64,7 @@ class ReflectionsJudgeScore:
         elif self.confidence == "Not confident":
             wt = 0.33
 
-        if self.judge.expertise_in_category.lower() != self.entry_category.lower():
+        if self.entry_category.lower() not in self.judge.expertise_in_category:
             wt = 0.5 * wt
         return wt * self.unweighted_score
 
@@ -122,14 +123,18 @@ class ReflectionsEntry:
     def __eq__(self, other: "ReflectionsEntry"):
         return self.entry_id == other.entry_id
 
+    def __repr__(self):
+        return f"{self.category} . {self.entry_id}"
+
 
 class ReflectionsResult:
     def __init__(self, entry: ReflectionsEntry, ignore_coi: bool, min_num_judges_per_entry:int, all_judges: List[ReflectionsJudge]):
         # retain the last judge scoring entry from csv only
-        self.judges_yet_to_complete = []
+        self.judges_yet_to_complete: List[str] = []
         self.entry = entry
         self.judges_scores = entry.judges_scores
         self.ignore_coi = ignore_coi
+        self.num_short = 0
         self.min_num_judges_per_entry = min_num_judges_per_entry
         self.scoring_complete: bool = self.access_if_scoring_is_complete(all_judges)
         self.num_judges = len(self.judges_scores)
@@ -142,15 +147,15 @@ class ReflectionsResult:
 
     def access_if_scoring_is_complete(self, all_judges: List[ReflectionsJudge]):
         # Atleast one expert judge has scored. Make sure the judge has not marked it as a COI if we care about COIs.
-        expert_looked_at_it = any([judge_score.judge.is_expert and (self.ignore_coi or not judge_score.is_coi) for judge_score in self.judges_scores])
+        expert_looked_at_it = any([self.is_expert_judge(judge_score) and (self.ignore_coi or not judge_score.is_coi) for judge_score in self.judges_scores])
         if not expert_looked_at_it:
-            expected_expert = [j for j in all_judges if j.expertise_in_category.lower() == self.entry.category.lower()]
+            expected_expert = [j for j in all_judges if self.entry.category.lower() in j.expertise_in_category]
             self.judges_yet_to_complete.extend(expected_expert or ["need_expert"])
         sufficient_judges = len(self.judges_scores) >= self.min_num_judges_per_entry
         if not sufficient_judges:
             # get more general judges
-            num_short = self.min_num_judges_per_entry - len(self.judges_scores)
-            remind_these_general_judges = [x for x in all_judges if x.expertise_in_category=="" and x.judge_name not in self.entry.judges_score_dict]
+            self.num_short = self.min_num_judges_per_entry - len(self.judges_scores)
+            remind_these_general_judges = [x.judge_name for x in all_judges if not self.entry.category.lower() in x.expertise_in_category and x.judge_name not in self.entry.judges_score_dict]
             # not sure which of the list of general judges who didn't evaluate to remind so list everything.
             self.judges_yet_to_complete.extend(remind_these_general_judges or ["need_general"])
         return expert_looked_at_it and sufficient_judges
@@ -161,16 +166,20 @@ class ReflectionsResult:
     #     total_relevant_judges = len(expert_scores) + 1  # only 1 non-expert is considered
     #     return (max([x.weighted_score for x in non_expert_scores]) + sum([x.weighted_score for x in expert_scores]))/ total_relevant_judges
 
+    def is_expert_judge(self, judge_score: ReflectionsJudgeScore) -> bool:
+        return judge_score.judge.is_expert and judge_score.entry_category.lower() in judge_score.judge.expertise_in_category
+
     def get_max_formula_v2_avg_of_scores(self):
-        non_expert_scores = [judge_score for judge_score in self.judges_scores if not judge_score.judge.is_expert]
-        expert_scores = [judge_score for judge_score in self.judges_scores if judge_score.judge.is_expert]
+        non_expert_scores = [judge_score for judge_score in self.judges_scores if not self.is_expert_judge(judge_score)]
+        # is judge expert in this category.
+        expert_scores = [judge_score for judge_score in self.judges_scores if self.is_expert_judge(judge_score)]
         total_relevant_judges = len(expert_scores) + 1  # only 1 non-expert is considered
         return (max([x.weighted_score_v2 for x in non_expert_scores]) + sum([x.weighted_score_v2 for x in expert_scores]))/total_relevant_judges
 
     # accounts for missing non-expert reviews or low-confidence only non-expert review and high confidence expert review
     def get_max_formula_v3_avg_of_scores(self, HIGH_CONF_THRESHOLD=84):
-        non_expert_scores = [judge_score for judge_score in self.judges_scores if not judge_score.judge.is_expert]
-        expert_scores = [judge_score for judge_score in self.judges_scores if judge_score.judge.is_expert]
+        non_expert_scores = [judge_score for judge_score in self.judges_scores if not self.is_expert_judge(judge_score)]
+        expert_scores = [judge_score for judge_score in self.judges_scores if self.is_expert_judge(judge_score)]
         has_singleton_not_confidenct_non_expert = False
         has_very_high_confidence_expert = sum([x.weighted_score_v2 for x in expert_scores])/len(expert_scores) >= HIGH_CONF_THRESHOLD if len(expert_scores)>=1 else False
         if len(non_expert_scores) == 1 and non_expert_scores[0].confidence!="Very confident":
@@ -208,7 +217,7 @@ class ReflectionsResult:
         p = PrettyTable()
         p.field_names = ["entry id", "evaluation completed", "category", "remind these judges", "list of scores", "student name", "points_weighted_by_confidence", "points_weighted_by_expertise_and_confidence", "points_unweighted", "points_max_formula","points_max_formula_addresses_singleton_non_expert", "grade", "student info", "entry statement", "entry info urls", "entry email"]
         for result in result_list:
-            remind_judges = result.judges_yet_to_complete
+            remind_judges = "" if not result.judges_yet_to_complete else f"Any {result.num_short} of {', '.join(result.judges_yet_to_complete)}"
             p.add_row([result.entry.entry_id, result.scoring_complete, result.entry.category, remind_judges or "", result.entry.judges_scores, result.entry.student_info.get_formal_abbreviated_name(), result.weighted_by_confidence_avg_score, result.weighted_avg_score, result.unweighted_avg_score, result.max_formula_v2_score,result.max_formula_v3_score, result.entry.student_info.grade, result.entry.student_info.__repr__(), result.entry.statement, result.entry.urls.replace("\n",", "), result.entry.student_info.email])
         p.reversesort = True
         p.sortby = "points_max_formula_addresses_singleton_non_expert"
@@ -221,11 +230,14 @@ class ReflectionsResult:
         return p
 
 def create_entries(judges_scores_fp: str, judges_expertise: Dict[str, str]) -> List[ReflectionsEntry]:
-    # one student can have multiple entries, and multiple entries can be selected from one student.
-    d: Dict[ReflectionsEntry, List[ReflectionsJudgeScore]] = {}
+    # one student can have multiple entries,
+    # and multiple entries can be selected from one student.
+    d: Dict[ReflectionsEntry, Dict[ReflectionsJudge, ReflectionsJudgeScore]] = {}
 
     with open(judges_scores_fp) as infile:
         for j in csv.DictReader(infile):
+            if not j['entry_student_first_name']:
+                continue # ignore empty lines.
             student_info = StudentInfo(f_name = j['entry_student_first_name'],
                                        l_name = j['entry_student_last_name'],
                                        teacher = j['entry_student_teacher_name'],
@@ -241,16 +253,18 @@ def create_entries(judges_scores_fp: str, judges_expertise: Dict[str, str]) -> L
                                      judges_scores=[])
             judge_name = j['judge_name'].lower().strip()
             assert judge_name in judges_expertise, f"Judge name {judge_name} not found in {judges_expertise}"
-            judge = ReflectionsJudge(judge_name=judge_name, expertise_in_category=judges_expertise[judge_name])
+            judge = ReflectionsJudge(judge_name=judge_name, expertise_in_category_csv=judges_expertise[judge_name])
             if entry not in d:
-                d[entry] = []
-            d[entry].append(ReflectionsJudgeScore(judge=judge, csv_entry_dict=j))
+                d[entry] = {}
+            a_score = ReflectionsJudgeScore(judge=judge, csv_entry_dict=j)
+            # pick recent most entry. Overwrite judge score for an entry.
+            d[entry][judge] = a_score
 
     # create entries to evaluate
     entries: List[ReflectionsEntry] = []
-    for entry, judge_scores in d.items():
-        for j in judge_scores:
-            entry.add_judge_score(j)
+    for entry, judge_scores_dict in d.items():
+        for judge_name, judge_score in judge_scores_dict.items():
+            entry.add_judge_score(judge_score)
         entries.append(entry)
     return entries
 
@@ -270,31 +284,36 @@ def create_report_for_judges(reflections_entries, judges_expertise, reveal_score
     return p
 
 
-def main(judges_scores_fp: str, judges_expertise: Dict[str, str], ignore_coi: bool, min_num_judges_per_entry:int, reveal_score_in_report: bool) -> (PrettyTable, PrettyTable):
-    judges_expertise = {k.lower(): v for k, v in judges_expertise.items()}
-    judges_all_objs = [ReflectionsJudge(judge_name=j_name, expertise_in_category=j_expertise) for j_name, j_expertise in judges_expertise.items()]
+def main(judges_scores_fp: str, judges_expertise_csv: Dict[str, str], ignore_coi: bool, min_num_judges_per_entry:int, reveal_score_in_report: bool) -> (PrettyTable, PrettyTable):
+    judges_expertise_csvdict = {k.lower(): v for k, v in judges_expertise_csv.items()}
+    judges_all_objs = [ReflectionsJudge(judge_name=j_name, expertise_in_category_csv=j_expertise) for j_name, j_expertise in judges_expertise_csvdict.items()]
     assert os.path.exists(judges_scores_fp), f"Check judges scores file path: {judges_scores_fp}"
-    reflections_entries = create_entries(judges_scores_fp=judges_scores_fp, judges_expertise=judges_expertise)
-    entries_report: PrettyTable = create_report_for_judges(reflections_entries=reflections_entries, judges_expertise= judges_expertise, reveal_score=reveal_score_in_report)
+    reflections_entries = create_entries(judges_scores_fp=judges_scores_fp, judges_expertise=judges_expertise_csvdict)
+    entries_report: PrettyTable = create_report_for_judges(reflections_entries=reflections_entries, judges_expertise= judges_expertise_csvdict, reveal_score=reveal_score_in_report)
     reflections_results = [ReflectionsResult(entry=entry, ignore_coi=ignore_coi, min_num_judges_per_entry=min_num_judges_per_entry, all_judges=judges_all_objs) for entry in reflections_entries]
     return ReflectionsResult.mk_pretty_table(reflections_results), entries_report
 
 
-if __name__ == '__main__':
+def main_discovery_2022_23():
     # Visual Arts
     # Music composition
     # Literature
     # Film/Video
     # Photography
+    # csv.
     sample_judges_expertise: Dict[str, str] = {
-        "shweta": "Visual Arts",
-        "whitney": "Music composition",
-        "thom": "Literature",
-        "trisha": "",
-        "dhivya priya v": ""
+        "shweta bhargava": "Visual Arts",
+        "whitney": "Music composition, Film/Video, Literature, Photography",
+        # "thom": "Literature",
+        "trisha": "Visual Arts",
+        # "dhivya priya v": ""
+        "amrutha": ""
     }
-    results, report = main(judges_scores_fp="data/judges_output/scores-submission-v2-data.csv",
-         judges_expertise=sample_judges_expertise,
+    results, report = main(
+         # judges_scores_fp="data/judges_output/scores-submission-v2-data.csv",
+         # Downloaded csv from https://docs.google.com/spreadsheets/d/1uDHSpLFI4JBSrymtVeGIIBFGGkt-dV5G0a7Ehsh6LVE/edit#gid=0
+         judges_scores_fp="/Users/nikett/Downloads/reflections-judge-outcome-2022-23-discovery.csv",
+         judges_expertise_csv=sample_judges_expertise,
          min_num_judges_per_entry=3,
          ignore_coi=False,
          reveal_score_in_report=False
@@ -302,3 +321,11 @@ if __name__ == '__main__':
     print(results)
     print(f"\n\n{'*'*80}\n")
     print(report)
+    results_file_path = '/tmp/results.csv'
+    with open(results_file_path, 'w', newline='') as f_output:
+        f_output.write(results.get_csv_string())
+    print(f"\nSee results file at {results_file_path}")
+
+
+if __name__ == '__main__':
+    main_discovery_2022_23()

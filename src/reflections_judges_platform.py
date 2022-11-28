@@ -99,7 +99,7 @@ def img_and_other_elems(file_types, urls):
     # <img src=url width="500" height="600">
     # <a href="url" target="_blank"> original link</a>
     for file_type, url in zip(file_types, urls):
-        if file_type == "jpg":
+        if file_type == "jpg" or file_type == "jpeg":
             # perhaps: create thumbnail from url (because original art does not load)
             # https://drive.google.com/file/d/14hz3ySPn-zB
             # https://drive.google.com/thumbnail?id=14hz3ySPn-zB
@@ -430,14 +430,15 @@ def rename_dict_keys(d):
     # entry_id, entry_category, entry_statement, entry_urls, entry_student_first_name,
     # entry_student_last_name, entry_student_teacher_name, entry_parent_email_id, entry_file_types
     d["entry_id"] = d["id"]
-    d["entry_category"] = alternate_dict_keys(d=d, alt_keys=["Select the art category for submission", "Arts Category"])
-    d["entry_statement"] = alternate_dict_keys(d=d, alt_keys=["Artist's statement" ,"Artist statement"])
-    d["entry_urls"] = alternate_dict_keys(d=d, alt_keys=["Upload entry file" , "Upload entry file with file name as (firstname.lastname.grade)"])
-    d["entry_student_first_name"] = d["Student first name"]
-    d["entry_student_last_name"] = d["Student last name"]
-    d["entry_student_teacher_name"] = d["Teacher's  name"]
-    d["entry_grade"] = d["Grade"]
+    d["entry_category"] = alternate_dict_keys(d=d, alt_keys=["Select the art category for submission", "Arts Category", "Category:"])
+    d["entry_statement"] = alternate_dict_keys(d=d, alt_keys=["Artist's statement" ,"Artist statement", "Artist Statement: (Please type EXACTLY as artist submitted on entry form; do not correct for grammatical and/or spelling errors.)"])
+    d["entry_urls"] = alternate_dict_keys(d=d, alt_keys=["Upload entry file" , "Upload entry file with file name as (firstname.lastname.grade)", "Upload entry file. File should be named as (art.school.firstname.lastname.pdf/jpg/mp4)"])
+    d["entry_student_first_name"] = alternate_dict_keys(d=d, alt_keys=["Student first name", "Artist's first name"])
+    d["entry_student_last_name"] = alternate_dict_keys(d=d, alt_keys=["Student last name", "Artist's last name"])
+    d["entry_student_teacher_name"] = alternate_dict_keys(d=d, alt_keys=["Teacher's name", "Teacher's  name"])
     d["entry_grade_division"] = d["Grade division"]
+    # Sometimes (e.g., at ISD level) only grade division is used.
+    d["entry_grade"] = alternate_dict_keys(d=d, alt_keys=["Grade"]) or d["entry_grade_division"]
     d["entry_parent_email_id"] = d["Email Address"]
     d["entry_file_types"] = d.get("file_type", "")   # TODO check file type
     # TODO add special arts category?
@@ -519,9 +520,17 @@ if __name__ == '__main__':
     #      )
 
     # for 2022-23 (Discovery)
-    main(data_entries_fp= "/Users/nikett/Desktop/reflections.discovery.2022.csv",
-         out_dir= "data/forms",
-         judges =["Dhivya", "Shweta", "Thom", "Trisha", "Whitney"],
-         website_base_addr = "https://anjali.tandon.info/schools/reflections_discovery",
-         form_action="https://script.google.com/macros/s/AKfycbyjb-sQNrv-wq0s-6Cv8HN3Z0IErmcL_4YiymPQnfpqgRN8FqXJUHAE7492NABX6QW0rg/exec"
+    # main(data_entries_fp= "/Users/nikett/Desktop/reflections.discovery.2022.csv",
+    #      out_dir= "data/forms",
+    #      judges =["Dhivya", "Shweta", "Thom", "Trisha", "Whitney"],
+    #      website_base_addr = "https://anjali.tandon.info/schools/reflections_discovery",
+    #      form_action="https://script.google.com/macros/s/AKfycbyjb-sQNrv-wq0s-6Cv8HN3Z0IErmcL_4YiymPQnfpqgRN8FqXJUHAE7492NABX6QW0rg/exec"
+    #      )
+
+    # for 2022-23 (ISD)
+    main(data_entries_fp= "/Users/nikett/Desktop/reflections.isd.entries3.csv",
+         out_dir= "data/forms_isd",
+         judges =[""],
+         website_base_addr = "https://anjali.tandon.info/schools/reflections_isd",
+         form_action="https://script.google.com/macros/s/AKfycbyHqmjviglhSTKc4zcrsTT7KiXjZJIWdFDSzml62XkXO4xnP2I3lc-wJMpg_nya7nUwww/exec"
          )
