@@ -6,7 +6,7 @@ import csv
 import os
 from typing import Dict, Any, List
 
-from src.utils import ensure_path, save_to_file, split_csv
+from src.utils import ensure_path, save_to_file, split_csv, csv_to_dict
 
 
 # (future_todo) a cleaner way would be to use a class with the following entries.
@@ -25,7 +25,7 @@ from src.utils import ensure_path, save_to_file, split_csv
 
 
 # <body onload="parse_remote_csv()">
-def fill_overall_template(form_arr, entry_ids, categories, grades, judges):
+def fill_overall_template(form_arr, entry_ids, categories, grades, judge_entries_dict):
     head = ''' 
 <!DOCTYPE html>
 <html>
@@ -63,20 +63,36 @@ body {
     # TODO read is_evaluated status from a google sheet.
 
     # can make this less hardcoded.
-    headers = ["Entry","..."]
-    # for judge in judges:
-    #     headers.append(f"Judge {str.capitalize(judge)}")
+    navi_full_names = sorted(list(judge_entries_dict.keys()))
+    navi_names = [str.capitalize(jn.split(' ')[0]) for jn in navi_full_names]
+    for navi, navi_full in zip(navi_names, navi_full_names):
+        rows.append(f'<a href="#{navi}" >{navi_full}</a><br>')
+    rows.append(f'<br><p><br></p>')
 
-    rows.append(f"<tr>{newline.join(['<th>' + x + '</th>' + newline for x in headers])}</tr>\n")
-    for form_full_path, entry_id, category, grade in zip(form_arr, entry_ids, categories, grades):
-        rows.append(f'<tr>')
-        rows.append(f'\n\t<td id="entry_{entry_id}"> <a href="{form_full_path}">Entry {entry_id}  --  ({category}) -- {grade}</a></td>')
-        rows.append(f'\n\t<td id="dummy_{entry_id}">  </td>')
-        # for judge in judges:
-        #     rows.append(f'\n\t<td id=f"judge_{judge.lower()}_{entry_id}"> x </td>')
-        rows.append('</tr>')
+    for tbl_full_name, tbl_short_name in zip(navi_full_names, navi_names):
+        rows.append(f'\n<table id="{tbl_short_name}" style=\"border:2px solid blue; padding: 10px 20px; \">')
+        rows.append(f"{newline.join(['<th>' + tbl_full_name + '</th>' + newline])}\n")
+        for entry_id in judge_entries_dict[tbl_full_name]:
+            entry_id = int(entry_id)
+            rows.append(f'<tr>')
+            rows.append(f'\n\t<td id="entry_{entry_id}"> <a href="{form_arr[entry_id-1]}">Entry {entry_id}  --  ({categories[entry_id-1]}) -- {grades[entry_id-1]}</a></td>')
+            rows.append(f'\n\t<td id="dummy_{entry_id}">  </td>')
+            rows.append('</tr>')
+        rows.append('\n</table><br><hr><br>')
 
-    body = '\n<table style=\"border:2px solid blue; padding: 10px 20px; \">' + '\n'.join(rows) + '\n</table>'
+    body = "\n".join(rows)
+
+    # headers = ["Entry","..."]
+    # for judge_name, judge_entries in judge_entries_dict.items():
+    #     headers.append(f"Judge {str.capitalize(judge_name.split(' ')[0])}")
+    # rows.append(f"<tr>{newline.join(['<th>' + x + '</th>' + newline for x in headers])}</tr>\n")
+    # for form_full_path, entry_id, category, grade in zip(form_arr, entry_ids, categories, grades):
+    #     rows.append(f'<tr>')
+    #     rows.append(f'\n\t<td id="entry_{entry_id}"> <a href="{form_full_path}">Entry {entry_id}  --  ({category}) -- {grade}</a></td>')
+    #     rows.append(f'\n\t<td id="dummy_{entry_id}">  </td>')
+    #     rows.append('</tr>')
+    # body = '\n<table style=\"border:2px solid blue; padding: 10px 20px; \">' + '\n'.join(rows) + '\n</table>'
+
     tail='''
 </body>
 </html>
@@ -429,7 +445,7 @@ def rename_dict_keys(d):
     # EXPECTED:
     # entry_id, entry_category, entry_statement, entry_urls, entry_student_first_name,
     # entry_student_last_name, entry_student_teacher_name, entry_parent_email_id, entry_file_types
-    d["entry_id"] = d["id"]
+    d["entry_id"] = alternate_dict_keys(d=d, alt_keys=["id", "ID"])
     d["entry_category"] = alternate_dict_keys(d=d, alt_keys=["Select the art category for submission", "Arts Category", "Category:"])
     d["entry_statement"] = alternate_dict_keys(d=d, alt_keys=["Artist's statement" ,"Artist statement", "Artist Statement: (Please type EXACTLY as artist submitted on entry form; do not correct for grammatical and/or spelling errors.)"])
     d["entry_urls"] = alternate_dict_keys(d=d, alt_keys=["Upload entry file" , "Upload entry file with file name as (firstname.lastname.grade)", "Upload entry file. File should be named as (art.school.firstname.lastname.pdf/jpg/mp4)"])
@@ -447,7 +463,29 @@ def rename_dict_keys(d):
     return d
 
 
-def load_data_to_forms(fp, out_dir, form_action, website_base_addr, judges):
+def allocate_judges(judges_expertise: Dict[str, List[str]], judges_max_workload: Dict[str, int], entry_ids, categories):
+    """
+    :param judges_max_workload: precomputed manually e.g., angel -> 15, ...
+    :param judges_expertise: anjali -> [Visual arts], angel -> [Dance, Music]
+    :param entry_ids: [1,2,3 ...]
+    :param categories: [Visual arts, Music, ...]
+    :return: anjali -> [1,2,3,4,...], angel -> [3,4,5,6,7...]
+             3 -> [anjali, angel]
+    """
+    ja = {}
+    entry_judges: Dict[str, List[str]] = {}
+    for entry_id, category in zip(entry_ids, categories):
+        for jname, jexp in judges_expertise.items():
+            if jname not in ja:
+                ja[jname] = []
+            if category in jexp and len(ja[jname]) < int(judges_max_workload[jname]):
+                ja[jname].append(entry_id)
+                if entry_id not in entry_judges:
+                    entry_judges[entry_id] = []
+                entry_judges[entry_id].append(jname)
+    return ja, entry_judges
+
+def load_data_to_forms(fp, out_dir, form_action, website_base_addr, judges_expertise, judges_max_workload):
 
     index_html = f"{out_dir}/index.html"
     successful_forms = 0
@@ -475,21 +513,26 @@ def load_data_to_forms(fp, out_dir, form_action, website_base_addr, judges):
             category_arr.append(d["entry_category"])
             successful_forms += 1
         print(f"Saving index.html to {index_html}")
+        judge_entries_dict, entry_judges_dict = allocate_judges(judges_expertise=judges_expertise,
+                                             judges_max_workload=judges_max_workload,
+                                             entry_ids=entry_id_arr,
+                                             categories=category_arr)
         save_to_file(content=fill_overall_template(
                                 form_arr=form_online_paths_arr,
                                 entry_ids=entry_id_arr,
                                 categories=category_arr,
                                 grades=grades_arr,
-                                judges=judges),
+                                judge_entries_dict=judge_entries_dict),
                      out_fp=index_html)
         return successful_forms
 
 
-def main(data_entries_fp: str, out_dir: str, judges: List[str], website_base_addr: str, form_action: str):
+def main(data_entries_fp: str, out_dir: str, judges_expertise, judges_max_workload, website_base_addr: str, form_action: str):
     """
+    :param judges_max_workload:
+    :param judges_expertise:
     :param data_entries_fp: "data/judges_input/real-judges-data.csv"
     :param out_dir: "data/forms"
-    :param judges: ["Dhivya", "Shweta", "Thom", "Trisha", "Whitney"]
     :param website_base_addr: "file://" # http://www.shrikrishnajewels.com/compile/forms
     :param form_action: "https://script.google.com/macros/s/AKfycbyi-42Psz_6118nWOeQNqSL_nXu4VejtnWVtuzH1U5P92w8IZTEXGKdtbmtXyi53ZJR8w/exec"
     :return:
@@ -498,7 +541,8 @@ def main(data_entries_fp: str, out_dir: str, judges: List[str], website_base_add
     ensure_path(fp=out_dir, is_dir=True)
     return load_data_to_forms(fp=data_entries_fp,
                        out_dir=out_dir,
-                       judges=judges,
+                       judges_expertise=judges_expertise,
+                       judges_max_workload=judges_max_workload,
                        website_base_addr=website_base_addr,
                        form_action=form_action)
 
@@ -528,9 +572,14 @@ if __name__ == '__main__':
     #      )
 
     # for 2022-23 (ISD)
-    main(data_entries_fp= "/Users/nikett/Desktop/reflections.isd.entries3.csv",
+    # tab: csv-to-evaluate
+    # https://docs.google.com/spreadsheets/d/1ep1lc6HiPvs8iAmtIjzynnFOLRtTUcD6quLffBZ1bWA/edit#gid=56964639
+    main(data_entries_fp= "data/confidential/reflections-isd-to-evaluate.csv",
          out_dir= "data/forms_isd",
-         judges =[""],
+         judges_expertise = csv_to_dict("data/confidential/judges.csv", "name", "category", split_val_on=","),
+         judges_max_workload = csv_to_dict("data/confidential/judges.csv", "name", "max_entries_to_judge"),
          website_base_addr = "https://anjali.tandon.info/schools/reflections_isd",
+         # following comes from: https://docs.google.com/spreadsheets/d/10dXQYOuTq4kCt8iuGvR8zYMWIoDie1px1_4hKxt9WzQ/edit#gid=0
+         # that is the sheet where judges data goes to.
          form_action="https://script.google.com/macros/s/AKfycbyHqmjviglhSTKc4zcrsTT7KiXjZJIWdFDSzml62XkXO4xnP2I3lc-wJMpg_nya7nUwww/exec"
          )

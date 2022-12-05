@@ -45,6 +45,12 @@ def save_to_file(content: str, out_fp: str):
     with open(out_fp, 'w') as outfile:
         outfile.write(content)
 
+def csv_to_dict(csv_path, key_id, val_id, split_val_on=None):
+    dic = {}
+    with open(csv_path, 'r') as in_csv:
+        for d in csv.DictReader(in_csv):
+            dic[d[key_id]] = [x.strip() for x in d[val_id].split(split_val_on)] if split_val_on is not None else d[val_id]
+    return dic
 
 if __name__ == '__main__':
     abbreviate_all(input_fp="data/todo-abbreviate-lastname.csv",
