@@ -72,10 +72,17 @@ body {
     for tbl_full_name, tbl_short_name in zip(navi_full_names, navi_names):
         rows.append(f'\n<table id="{tbl_short_name}" style=\"border:2px solid blue; padding: 10px 20px; \">')
         rows.append(f"{newline.join(['<th>' + tbl_full_name + '</th>' + newline])}\n")
-        for entry_id in judge_entries_dict[tbl_full_name]:
+        entries_to_judge = judge_entries_dict[tbl_full_name]
+        if not entries_to_judge: # e.g., a backup judge has no entries yet.
+            rows.append(f'<tr>')
+            rows.append(f'\n\t<td> TBD </td>')
+            rows.append(f'\n\t<td id="dummy">  </td>')
+            rows.append('</tr>')
+
+        for entry_id in entries_to_judge:
             entry_id = int(entry_id)
             rows.append(f'<tr>')
-            rows.append(f'\n\t<td id="entry_{entry_id}"> <a href="{form_arr[entry_id-1]}">Entry {entry_id}  --  ({categories[entry_id-1]}) -- {grades[entry_id-1]}</a></td>')
+            rows.append(f'\n\t<td id="entry_{entry_id}"> <a href="{form_arr[entry_id-1]}" target="_blank" >Entry {entry_id}  --  ({categories[entry_id-1]}) -- {grades[entry_id-1]}</a></td>')
             rows.append(f'\n\t<td id="dummy_{entry_id}">  </td>')
             rows.append('</tr>')
         rows.append('\n</table><br><hr><br>')
@@ -462,6 +469,28 @@ def rename_dict_keys(d):
     d["entry_is_valid"] = d.get("is_valid_final_entry", "")
     return d
 
+def allocate_judges_by_judgewise_entry(judges_expertise: Dict[str, List[str]], judges_max_workload: Dict[str, int], entry_ids, categories):
+    """
+    :param judges_max_workload: precomputed manually e.g., angel -> 15, ...
+    :param judges_expertise: anjali -> [Visual arts], angel -> [Dance, Music]
+    :param entry_ids: [1,2,3 ...]
+    :param categories: [Visual arts, Music, ...]
+    :return: anjali -> [1,2,3,4,...], angel -> [3,4,5,6,7...]
+             3 -> [anjali, angel]
+    """
+    ja = {}
+    entry_judges: Dict[str, List[str]] = {}
+    for jname, jexp in judges_expertise.items():
+        for entry_id, category in zip(entry_ids, categories):
+            if jname not in ja:
+                ja[jname] = []
+            if category in jexp and len(ja[jname]) < int(judges_max_workload[jname]) \
+                    and (category != "Visual Arts" or len(entry_judges.get(entry_id, [])) < 2):
+                ja[jname].append(entry_id)
+                if entry_id not in entry_judges:
+                    entry_judges[entry_id] = []
+                entry_judges[entry_id].append(jname)
+    return ja, entry_judges
 
 def allocate_judges(judges_expertise: Dict[str, List[str]], judges_max_workload: Dict[str, int], entry_ids, categories):
     """
@@ -478,12 +507,31 @@ def allocate_judges(judges_expertise: Dict[str, List[str]], judges_max_workload:
         for jname, jexp in judges_expertise.items():
             if jname not in ja:
                 ja[jname] = []
-            if category in jexp and len(ja[jname]) < int(judges_max_workload[jname]):
+            if category in jexp and len(ja[jname]) < int(judges_max_workload[jname]) \
+               and (category != "Visual Arts" or len(entry_judges.get(entry_id, [])) < 2):
                 ja[jname].append(entry_id)
                 if entry_id not in entry_judges:
                     entry_judges[entry_id] = []
                 entry_judges[entry_id].append(jname)
     return ja, entry_judges
+
+
+def print_entry_judges_dict(entry_judges_dict, categories):
+    total_visual_arts_corrections = 0
+    for e, judges in entry_judges_dict.items():
+        cat = categories[int(e) - 1]
+        print(f"Entry {e}\t{cat}\t{len(judges)}\t[{', '.join(judges)}]")
+        if cat == "Visual Arts":
+            if len(judges) != 2:
+                print(f"\t\tVisual arts entry above != 2 judges")
+            total_visual_arts_corrections += len(judges)
+    print(f"\n\ntotal_visual_arts_corrections = {total_visual_arts_corrections}")
+
+
+def print_judge_workload(judge_entries_dict):
+    for j, entries in judge_entries_dict.items():
+        print(f"Judge {j}: {len(entries)}")
+
 
 def load_data_to_forms(fp, out_dir, form_action, website_base_addr, judges_expertise, judges_max_workload):
 
@@ -513,10 +561,12 @@ def load_data_to_forms(fp, out_dir, form_action, website_base_addr, judges_exper
             category_arr.append(d["entry_category"])
             successful_forms += 1
         print(f"Saving index.html to {index_html}")
-        judge_entries_dict, entry_judges_dict = allocate_judges(judges_expertise=judges_expertise,
+        judge_entries_dict, entry_judges_dict = allocate_judges_by_judgewise_entry(judges_expertise=judges_expertise,
                                              judges_max_workload=judges_max_workload,
                                              entry_ids=entry_id_arr,
                                              categories=category_arr)
+        print_entry_judges_dict(entry_judges_dict, categories=category_arr)
+        print_judge_workload(judge_entries_dict)
         save_to_file(content=fill_overall_template(
                                 form_arr=form_online_paths_arr,
                                 entry_ids=entry_id_arr,
@@ -574,6 +624,7 @@ if __name__ == '__main__':
     # for 2022-23 (ISD)
     # tab: csv-to-evaluate
     # https://docs.google.com/spreadsheets/d/1ep1lc6HiPvs8iAmtIjzynnFOLRtTUcD6quLffBZ1bWA/edit#gid=56964639
+    # judges details are saved from here: https://docs.google.com/spreadsheets/d/1ep1lc6HiPvs8iAmtIjzynnFOLRtTUcD6quLffBZ1bWA/edit?pli=1#gid=1652496626
     main(data_entries_fp= "data/confidential/reflections-isd-to-evaluate.csv",
          out_dir= "data/forms_isd",
          judges_expertise = csv_to_dict("data/confidential/judges.csv", "name", "category", split_val_on=","),
