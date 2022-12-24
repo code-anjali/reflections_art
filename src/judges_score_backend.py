@@ -23,12 +23,12 @@ class JudgeScoresBackend:
         self.judge_scores: Dict[int, List[List[str]]] = self.load_judge_scores()
         self.judge_dashboard: Dict[str, List[EntryJudged]] = self.load_judge_dashboard()
 
-    def lookup_judge_scores(self, judge_name) -> List["EntryJudged"]:
+    def lookup_judge_scores(self, judge_name, judge_secret) -> List["EntryJudged"]:
         if not judge_name.strip():
             return []
         judge_first_name_capitalized = str.capitalize(judge_name.strip().lower().split(" ")[0])
         for jname, entries_judged in self.judge_dashboard.items():
-            if jname.split(" ")[0] == judge_first_name_capitalized:
+            if jname.split(" ")[0] == judge_first_name_capitalized and entries_judged[0].judge_secret == judge_secret:
                 return self.judge_dashboard[jname]
         return [] # name not found.
 
@@ -36,10 +36,11 @@ class JudgeScoresBackend:
         p= PrettyTable()
         if not entries:
             return p
-        p.field_names = ["completed", "entry id", "entry url", "interpretation", "creativity", "technique", "total"]
+        p.field_names = ["completed", "entry id", "entry title", "entry url", "interpretation", "creativity", "technique", "total"]
         for result in entries:
             p.add_row(["\U0001F44D" if result.completed else "\U0001F44E",
                        result.entry_id,
+                       result.entry_title,
                        result.entry_url,
                        result.judge_score_interpretation,
                        result.judge_score_creativity,
@@ -107,6 +108,7 @@ class JudgeScoresBackend:
             for judge in judges:
                 judge_first_name=judge.split(" ")[0]
                 score_cols = self.get_judge_score_cols(self.judge_scores.get(entry_id, []), judge_first_name=judge_first_name)
+                judge_secret = score_cols[11] if score_cols else "xxx"
                 entry_type = score_cols[1] if score_cols else ""
                 entry_title_words = score_cols[2].split(" ") if score_cols and score_cols[2] else []
                 entry_title = " ".join(entry_title_words[: min(len(entry_title_words), 6)])
@@ -120,6 +122,7 @@ class JudgeScoresBackend:
                                                           entry_id=entry_id,
                                                           entry_title=f"({entry_type}) {entry_title}...",
                                                           judge_name=judge,
+                                                          judge_secret=judge_secret,
                                                           judge_score_interpretation=judge_score_interpretation,
                                                           judge_score_creativity=judge_score_creativity,
                                                           judge_score_technique=judge_score_technique,
@@ -136,6 +139,7 @@ class EntryJudged:
     entry_id: int
     entry_title: str
     judge_name: str
+    judge_secret: str
     completed: bool
     judge_score_interpretation: int
     judge_score_creativity: int
@@ -146,6 +150,6 @@ class EntryJudged:
 
 if __name__ == '__main__':
     backend = JudgeScoresBackend()
-    results = backend.lookup_judge_scores(judge_name="janet")
+    results = backend.lookup_judge_scores(judge_name="janet", judge_secret="dummy")
     pt = backend.to_pretty_table(entries=results)
     print(pt)
