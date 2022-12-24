@@ -16,6 +16,13 @@ from prettytable import PrettyTable
 from src.gsheet_db_connector import establish_connection
 
 
+def display_score(score):
+    if score < 0:
+        return "-"
+    else:
+        return score
+
+
 class JudgeScoresBackend:
     def __init__(self):
         self.db_conn = establish_connection(in_localhost=False)
@@ -42,14 +49,14 @@ class JudgeScoresBackend:
                        result.entry_id,
                        result.entry_title,
                        result.entry_url,
-                       result.judge_score_interpretation,
-                       result.judge_score_creativity,
-                       result.judge_score_technique,
-                       result.judge_score_total,
+                       display_score(result.judge_score_interpretation),
+                       display_score(result.judge_score_creativity),
+                       display_score(result.judge_score_technique),
+                       display_score(result.judge_score_total),
                        ])
         p.reversesort = True
         p.sortby = "total"
-        p.sort_key = lambda x: float(x[-1])  # i.e., by total
+        p.sort_key = lambda x: float(x[-1]) if x[-1] != "-" else -1  # i.e., by total
         return p
 
     def load_judge_assignment(self) -> Dict[int, List[str]]:
@@ -108,7 +115,7 @@ class JudgeScoresBackend:
             for judge in judges:
                 judge_first_name=judge.split(" ")[0]
                 score_cols = self.get_judge_score_cols(self.judge_scores.get(entry_id, []), judge_first_name=judge_first_name)
-                judge_secret = score_cols[11] if score_cols else "xxx"
+                judge_secret = score_cols[11] if score_cols else "dummy" # hide this default secret.
                 entry_type = score_cols[1] if score_cols else ""
                 entry_title_words = score_cols[2].split(" ") if score_cols and score_cols[2] else []
                 entry_title = " ".join(entry_title_words[: min(len(entry_title_words), 6)])
@@ -150,6 +157,6 @@ class EntryJudged:
 
 if __name__ == '__main__':
     backend = JudgeScoresBackend()
-    results = backend.lookup_judge_scores(judge_name="janet", judge_secret="dummy")
+    results = backend.lookup_judge_scores(judge_name="zoe", judge_secret="dummy")
     pt = backend.to_pretty_table(entries=results)
     print(pt)
