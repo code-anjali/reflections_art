@@ -1,13 +1,12 @@
 import streamlit as st
 import sys
 
+from prettytable import PrettyTable
 
 sys.path.append('.')
 sys.path.append('..')
 
 from src.judges_score_backend import JudgeScoresBackend
-from ui.utils import to_markdown_table
-
 
 
 def main():
@@ -23,7 +22,9 @@ def main():
         if submitted:
             st.write(f"\n{'*'*80}\n\nAssignments for {judge_name}")
             results = st.session_state["backend"].lookup_judge_scores(judge_name=judge_name, judge_secret=judge_secret)
-            st.write(to_markdown_table(st.session_state["backend"].to_pretty_table(entries=results)))
+            pt_table: PrettyTable = st.session_state["backend"].to_pretty_table(entries=results)
+            st.markdown(pt_table.get_html_string(), unsafe_allow_html=True)
+
 
 
 if __name__ == '__main__':

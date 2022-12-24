@@ -17,7 +17,7 @@ def upload_file(file_desc: str, out_path: str, st):
                 st.write(f"Sample line from {file_desc}\n")
                 st.write(line)
 
-def to_markdown_table(pt: PrettyTable):
+def to_markdown_table_new(pt: PrettyTable):
     """
     credit: https://gist.github.com/dbzm/68256c86c60d70072576
     Print a pretty table as a markdown table
@@ -28,6 +28,9 @@ def to_markdown_table(pt: PrettyTable):
     :rtype: str
     :returns: A string that adheres to git markdown table rules
     """
+    # | Syntax      | Description |
+    # | ----------- | ----------- |
+
     markdown = "<cannot create pretty pt table>"
     if pt:
         _junc = pt.junction_char
