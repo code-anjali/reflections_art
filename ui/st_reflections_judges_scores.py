@@ -12,7 +12,7 @@ from ui.utils import to_markdown_table
 
 def main():
     st.set_page_config(layout="wide")
-    st.write("Reflections Judges Dashboard\n")
+    st.write("Reflections Judges Dashboard (takes 3 seconds to load)\n")
     if "backend" not in st.session_state:
         st.session_state["backend"] = JudgeScoresBackend()  # cache backend in streamlit cache
 
