@@ -1,6 +1,6 @@
 import streamlit as st
 import sys
-
+import html
 from prettytable import PrettyTable
 
 sys.path.append('.')
@@ -23,7 +23,10 @@ def main():
             st.write(f"\n{'*'*80}\n\nAssignments for {judge_name}")
             results = st.session_state["backend"].lookup_judge_scores(judge_name=judge_name, judge_secret=judge_secret)
             pt_table: PrettyTable = st.session_state["backend"].to_pretty_table(entries=results)
-            st.markdown(pt_table.get_html_string(), unsafe_allow_html=True)
+            tbl = pt_table.get_html_string(format=True)
+            tbl = html.unescape(tbl)   # crucial step
+            st.markdown(tbl, unsafe_allow_html=True)
+
 
 
 
