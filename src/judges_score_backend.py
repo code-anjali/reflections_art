@@ -45,7 +45,7 @@ class JudgeScoresBackend:
             return p
         p.field_names = ["completed", "entry id", "entry title", "entry url", "interpretation", "creativity", "technique", "total"]
         for result in entries:
-            p.add_row(["\U0001F44D" if result.completed else "\U0001F44E",
+            p.add_row(["\U0001F44D" if result.completed else "x (not done)",
                        result.entry_id,
                        result.entry_title,
                        '<a href=\"' + result.entry_url + '\">' + 'judging portal link' + '</a>',
