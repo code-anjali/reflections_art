@@ -220,7 +220,7 @@ class ReflectionsResult:
             remind_judges = "" if not result.judges_yet_to_complete else f"Any {result.num_short} of {', '.join(result.judges_yet_to_complete)}"
             p.add_row([result.entry.entry_id, result.scoring_complete, result.entry.category, remind_judges or "", result.entry.judges_scores, result.entry.student_info.get_formal_abbreviated_name(), result.weighted_by_confidence_avg_score, result.weighted_avg_score, result.unweighted_avg_score, result.max_formula_v2_score,result.max_formula_v3_score, result.entry.student_info.grade, result.entry.student_info.__repr__(), result.entry.statement, result.entry.urls.replace("\n",", "), result.entry.student_info.email])
         p.reversesort = True
-        p.sortby = "points_max_formula_addresses_singleton_non_expert"
+        p.sortby = "points_unweighted"
         p.sort_key = lambda x: float(x[0])
         p.align['student info'] = 'l'
         p.align['remind these judges'] = 'l'
@@ -252,8 +252,8 @@ def create_entries(judges_scores_fp: str, judges_expertise: Dict[str, str]) -> L
                                      student_info=student_info,
                                      judges_scores=[])
             judge_name = j['judge_name'].lower().strip()
-            assert judge_name in judges_expertise, f"Judge name {judge_name} not found in {judges_expertise}"
-            judge = ReflectionsJudge(judge_name=judge_name, expertise_in_category_csv=judges_expertise[judge_name])
+            assert not judges_expertise or judge_name in judges_expertise, f"Judge name {judge_name} not found in {judges_expertise}"
+            judge = ReflectionsJudge(judge_name=judge_name, expertise_in_category_csv=judges_expertise.get(judge_name, ""))
             if entry not in d:
                 d[entry] = {}
             a_score = ReflectionsJudgeScore(judge=judge, csv_entry_dict=j)
@@ -327,5 +327,33 @@ def main_discovery_2022_23():
     print(f"\nSee results file at {results_file_path}")
 
 
+def main_isd_2022_23():
+    # Visual Arts
+    # Music composition
+    # Literature
+    # Film/Video
+    # Photography
+    # csv.
+    sample_judges_expertise: Dict[str, str] = {}  # check if this can be empty.
+    results, report = main(
+        # judges_scores_fp="data/judges_output/scores-submission-v2-data.csv",
+        # Downloaded csv from https://docs.google.com/spreadsheets/d/1uDHSpLFI4JBSrymtVeGIIBFGGkt-dV5G0a7Ehsh6LVE/edit#gid=0
+        judges_scores_fp="/Users/nikett/Downloads/reflections-judge-outcome-2022-23-isd.csv",
+        judges_expertise_csv=sample_judges_expertise,
+        min_num_judges_per_entry=2,
+        ignore_coi=False,
+        reveal_score_in_report=True
+    )
+    print(results)
+    print(f"\n\n{'*'*80}\n")
+    print(report)
+    results_file_path = '/tmp/results.csv'
+    with open(results_file_path, 'w', newline='') as f_output:
+        f_output.write(results.get_csv_string())
+    print(f"\nSee results file at {results_file_path}")
+
+
+
 if __name__ == '__main__':
-    main_discovery_2022_23()
+    # main_discovery_2022_23()
+    main_isd_2022_23()
