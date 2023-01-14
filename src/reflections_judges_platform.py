@@ -30,6 +30,7 @@ def fill_overall_template(form_arr, entry_ids, categories, grades, judge_entries
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 body {
@@ -116,8 +117,22 @@ def iframe_url(x: str):
     return x
 
 
+def non_iframe_url(url):
+    url_thumbnail = url.replace("https://drive.google.com/open?id=", "https://drive.google.com/file/d/")
+    url_thumbnail = url_thumbnail.replace("https://drive.google.com/file/d/", "https://lh3.googleusercontent.com/d/")
+    url_thumbnail = url_thumbnail.replace("/view", "/preview")
+    return url_thumbnail
 
-def img_and_other_elems(file_types, urls):
+def make_url(file_type, url):
+    if file_type in ["mp3", "mp4", "pdf", "docx", "doc"]:
+        return iframe_url(url)
+    elif file_type in ["jpg", "jpeg", "png"]:
+        return non_iframe_url(url)
+    else:
+        return url
+
+
+def img_and_other_elems(file_types, urls, width: str="640", height:str ="480"):
     arr = []
     # <img src=url width="500" height="600">
     # <a href="url" target="_blank"> original link</a>
@@ -134,29 +149,37 @@ def img_and_other_elems(file_types, urls):
             # https://drive.google.com/file/d/1WOdQZQ18xhBK8q8ZplJ2jHIpRPlEUN4l/view
             # https://drive.google.com/open?id=1WOdQZQ18xhBK8q8ZplJ2jHIpRPlEUN4l
 
-            url_thumbnail = url.replace("https://drive.google.com/open?id=", "https://drive.google.com/file/d/")
-            url_thumbnail = url_thumbnail.replace("https://drive.google.com/file/d/", "https://lh3.googleusercontent.com/d/")
-            url_thumbnail = url_thumbnail.replace("/view", "/preview")
-            arr.append(f'<img src="{url_thumbnail}" width="500" height="600">')
+            url_thumbnail = non_iframe_url(url)
+            # url_thumbnail = url.replace("https://drive.google.com/open?id=", "https://drive.google.com/file/d/")
+            # url_thumbnail = url_thumbnail.replace("https://drive.google.com/file/d/", "https://lh3.googleusercontent.com/d/")
+            # url_thumbnail = url_thumbnail.replace("/view", "/preview")
+
+            # --------------------------
+            #           ""Note"""
+            # --------------------------
+            # the following may be more b'ful with 500x500 for the web pages instead of 640x480
+
+            # arr.append(f'<img src="{url_thumbnail}" width="500" height="600">')
+            arr.append(f'<img src="{url_thumbnail}" width="{width}" height="{height}">')
             arr.append(f'<a href="{url}" target="_blank">Original image high resolution</a>')
         elif file_type == "mp3":
             url_mp3 = iframe_url(url)
-            arr.append(f'<iframe src="{url_mp3}" frameborder="1" width="640" height="480"></iframe>')
+            arr.append(f'<iframe src="{url_mp3}" frameborder="1" width="{width}" height="{height}"></iframe>')
             arr.append(f'<a href={url_mp3}>Original audio link</a>')
         elif file_type == "mp4":
             url_mp4 = iframe_url(url)
-            arr.append(f'<iframe src="{url_mp4}" frameborder="1" width="640" height="480"></iframe>')
+            arr.append(f'<iframe src="{url_mp4}" frameborder="1" width="{width}" height="{height}"></iframe>')
             arr.append(f'<a href={url_mp4}>Original video link</a>')
         elif file_type == "pdf":
             # https://drive.google.com/open?id=1ySyK_mZ97BafYSGHzAtNKvxe9c8p28XI
             # https://drive.google.com/file/d/1ySyK_mZ97BafYSGHzAtNKvxe9c8p28XI/view
             # https://drive.google.com/file/d/1aGh69Sm5bta5U63Iu-EaxV1mWn9iyvPT/edit
             url_pdf = iframe_url(url)
-            arr.append(f'<iframe src="{url_pdf}" frameborder="1" width="640" height="480"></iframe>')
+            arr.append(f'<iframe src="{url_pdf}" frameborder="1" width="{width}" height="{height}"></iframe>')
             # arr.append(f'<a href={url}>Original PDF link</a>')
         elif file_type == "docx":
             url_docx = iframe_url(url)
-            arr.append(f'<iframe src="{url_docx}" frameborder="1" width="640" height="480"></iframe>')
+            arr.append(f'<iframe src="{url_docx}" frameborder="1" width="{width}" height="{height}"></iframe>')
             arr.append(f'<a href={url_docx}>Original docx link</a>')
         else:
             arr.append(f'<a href="{url}" target="_blank">Original link (file type: {file_type})</a>')
@@ -634,3 +657,6 @@ if __name__ == '__main__':
          # that is the sheet where judges data goes to.
          form_action="https://script.google.com/macros/s/AKfycbyHqmjviglhSTKc4zcrsTT7KiXjZJIWdFDSzml62XkXO4xnP2I3lc-wJMpg_nya7nUwww/exec"
          )
+
+
+
