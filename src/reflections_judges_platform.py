@@ -489,6 +489,7 @@ def rename_dict_keys(d):
     d["entry_file_types"] = d.get("file_type", "")   # TODO check file type
     # TODO add special arts category?
     d["entry_title"] = d["Title of artwork"]
+    d["entry_form"] = d["Upload entry form with file name. File should be named as (entry.school.firstname.lastname.pdf)"]
     d["entry_is_valid"] = d.get("is_valid_final_entry", "")
     return d
 

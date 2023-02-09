@@ -19,7 +19,7 @@ def mk_school(school_dict_entry):
     return f"{school_prefix} {school_suffix}"
 
 
-def publish_results(selected_ids: List[str], honorable_ids: List[str], in_fp, out_fp, out_fp_table):
+def publish_results(need_internal_info: bool, selected_ids: List[str], honorable_ids: List[str], in_fp, out_fp, out_fp_table):
     with open(out_fp, 'w') as o_handle:
         o_handle.write("""
         <!DOCTYPE html>
@@ -270,15 +270,42 @@ function search_studentname_or_schoolname() {
                 # o_handle.write("<tr><td></td><td></td><td></td><td></td></tr>")
                 # o_handle.write("<tr><td></td><td></td><td></td><td></td></tr>")
 
-                for data in [data_finalists, data_honorable]:
+                data_list = [data_finalists, data_honorable]
+                for data_id, data in enumerate(data_list):
                     # o_handle.write("<tr><td></td><td></td><td></td><td></td></tr>")
-                    for d in data:
-                        o_table_handle.write(f"""<tr>
-                        <td>{d['trophy']} {d['entry_student_first_name']} {d['entry_student_last_name']}</td> 
-                        <td>{mk_school(d['School:'])}</td>
-                        <td>{d['entry_grade_division']}</td>
-                        <td>{category}</td>
-                        </tr>""")
+                    for d_id, d in enumerate(data):
+                        if need_internal_info and data_id == 0: # only for finalists.
+                            entry_url_hrefs = "<br>".join([f"<a target='_blank' href='{x.strip()}'>url{xid+1}</a>" for xid, x in enumerate(d['entry_urls'].split(","))])
+                            o_table_handle.write(f"""<tr>
+                            <td>{d_id + 1}</td>
+                            <td>{d['entry_student_first_name']} {d['entry_student_last_name']}</td> 
+                            <td>{mk_school(d['School:'])}</td>
+                            <td>{d['entry_grade_division']}</td>
+                            <td>{d['entry_grade']}</td>
+                            <td>{category}</td>
+                            <td>{d['entry_parent_email_id']}</td>
+                            <td>{d['entry_title']}</td>
+                            <td>{d['entry_statement']}</td>
+                            <td>{entry_url_hrefs}</td>
+                            <td><a target="_blank" href="{d['entry_form']}">form</a></td>
+                            </tr>""")
+                        elif not need_internal_info:
+                            o_table_handle.write(f"""<tr>
+                            <td>{d['trophy']} {d['entry_student_first_name']} {d['entry_student_last_name']}</td> 
+                            <td>{mk_school(d['School:'])}</td>
+                            <td>{d['entry_grade_division']}</td>
+                            <td>{category}</td> 
+                            </tr>""")
+            # to publish results
+            # •Name
+            # •Grade level
+            # •School
+            # •Category
+            # •Artist statement
+            # •Title of artwork
+            # •grade
+            # •google drive link to the entry form
+            # •google drive link to artwork
             o_table_handle.write("\n</table><br><br><hr><br>")
             o_table_handle.write("</body></html>")
 
@@ -287,12 +314,15 @@ function search_studentname_or_schoolname() {
 
 
 if __name__ == '__main__':
-    # to publish results
+
     selected_ids_csv = "207, 200, 142, 150, 45, 46, 81, 104, 94, 47, 130, 199, 176, 57, 101, 138, 61, 58, 103, 125, 55, 100, 51, 119, 40, 202, 109, 71, 66, 126, 217, 143, 152, 72, 82, 148, 178, 127, 213, 175, 59, 52, 173, 201, 85, 102, 107, 203, 147, 106, 141, 129, 212, 214, special1, special2, special3"
     honorable_ids_csv = "209, 89, 25, 124, 149, 182, 137, 88, 53, 96, 208, 31, 5, 3, 111, 220, 97, 17, 93, 98"
+
+    need_internal_info = True
     publish_results(selected_ids=[x.strip() for x in selected_ids_csv.split(",")],
                     honorable_ids=[x.strip() for x in honorable_ids_csv.split(",")],
                     in_fp= "data/confidential/reflections-isd-to-evaluate.csv",
                     out_fp="/tmp/results.html",
-                    out_fp_table="/tmp/finalists.html"
+                    out_fp_table="/tmp/finalists.html",
+                    need_internal_info=need_internal_info
                     )
